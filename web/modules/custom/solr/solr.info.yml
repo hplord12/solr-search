@@ -1,0 +1,5 @@
+name: custom solr changes
+description: Custom module for solr changes.
+type: module
+core: 8.x
+package: Solr

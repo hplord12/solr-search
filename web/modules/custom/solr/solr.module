@@ -1,0 +1,70 @@
+<?php
+
+use Drupal\search_api\Query\QueryInterface;
+use Drupal\taxonomy\Entity\Term;
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function solr_preprocess_facets_item_list__checkbox__color_for_facets(&$variables) {
+  foreach ($variables['items'] as $key => &$value) {
+    $color_value = $value['value']['#title']['#value'];
+    list($rgb_code, $color_label) = explode('|', $value['value']['#title']['#value']);
+    $value['value']['#title']['#value'] = $rgb_code . ' ' . $color_label;
+  }
+}
+
+/**
+ * Alter Solr documents before they are sent to Solr for indexing.
+ *
+ * @param \Solarium\QueryType\Update\Query\Document[] $documents
+ *   An array of \Solarium\QueryType\Update\Query\Document\Document objects
+ *   ready to be indexed, generated from $items array.
+ * @param \Drupal\search_api\IndexInterface $index
+ *   The search index for which items are being indexed.
+ * @param \Drupal\search_api\Item\ItemInterface[] $items
+ *   An array of items to be indexed, keyed by their item IDs.
+ */
+function solr_search_api_solr_documents_alter(array &$documents, \Drupal\search_api\IndexInterface $index, array $items) {
+  if ($index->id() == 'product_index') {
+    foreach ($documents as $key => $document) {
+      $all_field = $document->getFields();
+
+      // Store term name instead of term id at solr side which will useful, 
+     // for query boosting by term name.
+      $term = Term::load($all_field['sm_field_categories']);
+      $name = $term->getName();
+      $document->setField('sm_field_categories', $name);
+
+      // Split color code and lable and show to end user.
+      $color_label = isset($all_field['ss_field_color']) ? $document->getFields()['ss_field_color'] : '';
+      $rgb_code = isset($all_field['ss_field_rgb']) ? $document->getFields()['ss_field_rgb'] : '';
+      if (!empty($color_label) && !empty($rgb_code)) {
+        $document->setField('ss_field_color', $rgb_code . '|' . $color_label);
+      }
+    }
+  }
+}
+
+
+/**
+ * Lets modules alter the Solarium select query before executing it.
+ *
+ * After this hook, the select query will be finally converted into an
+ * expression that will be processed by the lucene query parser. Therefore you
+ * can't modify the 'q' parameter here, because it gets overwritten by that
+ * conversion. If you need to modify the 'q' parameter you should implement an
+ * event listener instead of this hook that handles the solarium events (our
+ * connector injects the drupal event handler into solarium) or implement
+ * hook_search_api_solr_converted_query() instead. If you want to force a
+ * different parser like edismax you must set the 'defType' parameter
+ * accordingly.
+ *
+ * @param \Solarium\Core\Query\QueryInterface $solarium_query
+ *   The Solarium query object, as generated from the Search API query.
+ * @param \Drupal\search_api\Query\QueryInterface $query
+ *   The Search API query object representing the executed search query.
+ */
+function solr_search_api_solr_query_alter(\Solarium\Core\Query\QueryInterface $solarium_query, \Drupal\search_api\Query\QueryInterface $query) {
+
+}
